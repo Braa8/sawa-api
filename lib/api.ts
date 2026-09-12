@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { logger } from "./logger";
 
 export class ApiError extends Error {
   constructor(
@@ -40,7 +39,6 @@ export async function handleRoute(
       );
     }
 
-    logger.error({ err: error }, "Unhandled API route error");
     return json(
       {
         error: {
