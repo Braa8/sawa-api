@@ -10,7 +10,7 @@ export type RequestUser = {
   id: string;
   email: string | null;
   name: string;
-  role: UserRole;
+  role: UserRole | null;
   branchId: string | null;
 };
 

@@ -1,7 +1,9 @@
 import { handleRoute, json, readJson } from "../../../../../lib/api";
-import { firebaseAuth } from "../../../../../lib/firebase";
-import { firestore } from "../../../../../lib/firebase";
+import { firebaseAuth, firestore } from "../../../../../lib/firebase";
 import { Timestamp } from "firebase-admin/firestore";
+
+// Email validation regex
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: Request) {
   return handleRoute(async () => {
@@ -11,9 +13,9 @@ export async function POST(request: Request) {
       password, 
       name 
     } = body as { 
-      email?: string; 
-      password?: string; 
-      name?: string; 
+      email: string; 
+      password: string; 
+      name: string; 
     };
 
     if (!email || !password || !name) {
@@ -22,6 +24,19 @@ export async function POST(request: Request) {
           error: {
             code: "MISSING_FIELDS",
             message: "البريد الإلكتروني وكلمة المرور والاسم مطلوبون",
+          },
+        },
+        400,
+      );
+    }
+
+    // Validate email format
+    if (!emailRegex.test(email)) {
+      return json(
+        {
+          error: {
+            code: "INVALID_EMAIL",
+            message: "تنسيق البريد الإلكتروني غير صحيح",
           },
         },
         400,
@@ -69,13 +84,17 @@ export async function POST(request: Request) {
 
       // Create user document in Firestore without role (role will be assigned by owner later)
       const createdAt = Timestamp.now();
-      await firestore().collection("users").doc(userRecord.uid).set({
-        name,
-        email,
-        role: null, // No role assigned yet
-        branchId: null, // No branch assigned yet
-        createdAt,
-        updatedAt: createdAt,
+      const userDocRef = firestore().collection("users").doc(userRecord.uid);
+      
+      await firestore().runTransaction(async (transaction) => {
+        transaction.set(userDocRef, {
+          name,
+          email,
+          role: null, // No role assigned yet
+          branchId: null, // No branch assigned yet
+          createdAt,
+          updatedAt: createdAt,
+        });
       });
 
       return json(
@@ -95,12 +114,13 @@ export async function POST(request: Request) {
       );
     } catch (error: any) {
       console.error("Registration error:", error);
+      
+      // Don't expose sensitive error details to client
       return json(
         {
           error: {
             code: "REGISTRATION_FAILED",
-            message: "فشل إنشاء الحساب",
-            details: error.message,
+            message: "فشل إنشاء الحساب. يرجى المحاولة مرة أخرى.",
           },
         },
         500,

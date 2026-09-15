@@ -1,31 +1,49 @@
-import { handleRoute, json, readJson } from "../../../../../lib/api";
-import { firebaseAuth } from "../../../../../lib/firebase";
-import { firestore } from "../../../../../lib/firebase";
+
+import { handleRoute, json } from "../../../../../lib/api";
+import { firebaseAuth, firestore } from "../../../../../lib/firebase";
 
 export async function POST(request: Request) {
   return handleRoute(async () => {
-    const body = await readJson(request);
-    const { email, password } = body as { email?: string; password?: string };
-
-    if (!email || !password) {
-      return json(
-        {
-          error: {
-            code: "MISSING_FIELDS",
-            message: "البريد الإلكتروني وكلمة المرور مطلوبان",
-          },
-        },
-        400,
-      );
-    }
-
     try {
-      // Verify credentials using Firebase Admin SDK
-      const userRecord = await firebaseAuth().getUserByEmail(email);
-      
-      // Get user document from Firestore to check role
-      const userDoc = await firestore().collection("users").doc(userRecord.uid).get();
-      
+      const authorization = request.headers.get("authorization");
+
+      if (!authorization?.startsWith("Bearer ")) {
+        return json(
+          {
+            error: {
+              code: "UNAUTHORIZED",
+              message: "لا يوجد حساب بهذه المعلومات",
+            },
+          },
+          401,
+        );
+      }
+
+      const idToken = authorization.substring("Bearer ".length).trim();
+
+      if (!idToken) {
+        return json(
+          {
+            error: {
+              code: "UNAUTHORIZED",
+              message: "رمز المصادقة غير صالح",
+            },
+          },
+          401,
+        );
+      }
+
+      // Verify the Firebase ID Token
+      const decodedToken = await firebaseAuth().verifyIdToken(idToken);
+
+      const uid = decodedToken.uid;
+
+      // Get user document from Firestore
+      const userDoc = await firestore()
+        .collection("users")
+        .doc(uid)
+        .get();
+
       if (!userDoc.exists) {
         return json(
           {
@@ -39,9 +57,11 @@ export async function POST(request: Request) {
       }
 
       const userData = userDoc.data();
+
       const role = userData?.role;
 
-      if (!role || (role !== "owner" && role !== "manager")) {
+      // User must have an assigned role
+      if (role !== "owner" && role !== "manager") {
         return json(
           {
             error: {
@@ -53,43 +73,34 @@ export async function POST(request: Request) {
         );
       }
 
-      // Generate custom token for the user
-      const customToken = await firebaseAuth().createCustomToken(userRecord.uid);
+      const userRecord = await firebaseAuth().getUser(uid);
 
       return json({
         success: true,
         data: {
-          customToken,
           user: {
-            id: userRecord.uid,
+            id: uid,
             email: userRecord.email,
-            name: userData?.name || userRecord.displayName || "",
+            name:
+              userData?.name ||
+              userRecord.displayName ||
+              "",
             role,
             branchId: userData?.branchId || null,
           },
         },
       });
     } catch (error: any) {
-      if (error.code === "auth/user-not-found") {
-        return json(
-          {
-            error: {
-              code: "INVALID_CREDENTIALS",
-              message: "البريد الإلكتروني أو كلمة المرور غير صحيحة",
-            },
-          },
-          401,
-        );
-      }
+      console.error("Login verification error:", error);
 
       return json(
         {
           error: {
-            code: "LOGIN_FAILED",
-            message: "فشل تسجيل الدخول",
+            code: "INVALID_TOKEN",
+            message: "جلسة تسجيل الدخول غير صالحة",
           },
         },
-        500,
+        401,
       );
     }
   });
