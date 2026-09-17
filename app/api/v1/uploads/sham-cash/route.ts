@@ -3,7 +3,7 @@ import { put } from "@vercel/blob";
 import { badRequest, handleRoute, json } from "../../../../../lib/api";
 import { requireUser } from "../../../../../lib/auth";
 
-const MAX_RECEIPT_BYTES = 10 * 1024 * 1024;
+const MAX_RECEIPT_BYTES = 5 * 1024 * 1024;
 
 function safeFileName(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-120);
@@ -29,11 +29,17 @@ export async function POST(request: Request) {
     if (!(file instanceof File)) {
       throw badRequest("أرسل ملف PDF في الحقل file");
     }
-    if (file.type !== "application/pdf") {
-      throw badRequest("إيصال شام كاش يجب أن يكون بصيغة PDF");
-    }
     if (file.size > MAX_RECEIPT_BYTES) {
-      throw badRequest("حجم الإيصال يتجاوز الحد المسموح وهو 10MB");
+      throw badRequest("حجم الإيصال يتجاوز الحد المسموح وهو 5MB");
+    }
+
+    const signature = new Uint8Array(await file.slice(0, 5).arrayBuffer());
+    const pdfSignature = "%PDF-";
+    if (
+      signature.length !== pdfSignature.length ||
+      !signature.every((byte, index) => byte === pdfSignature.charCodeAt(index))
+    ) {
+      throw badRequest("الملف المرفوع ليس ملف PDF صالحاً");
     }
 
     const blob = await put(
