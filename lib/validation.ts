@@ -39,6 +39,13 @@ export const createBranchSchema = z.object({
   address: z.string().trim().min(2).max(240),
 });
 
+export const updateBranchSchema = z
+  .object({
+    name: z.string().trim().min(2).max(120).optional(),
+    address: z.string().trim().min(2).max(240).optional(),
+  })
+  .refine((value) => value.name !== undefined || value.address !== undefined);
+
 export const createManagerSchema = z.object({
   name: z.string().trim().min(2).max(120),
   email: z.string().trim().toLowerCase().email(),

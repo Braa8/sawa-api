@@ -4,7 +4,7 @@ import {
   type DocumentData,
 } from "firebase-admin/firestore";
 
-import { notFound } from "./api";
+import { badRequest, notFound } from "./api";
 import { firestore } from "./firebase";
 
 export type PaymentMethod = "cash" | "sham_cash";
@@ -115,6 +115,38 @@ export async function createBranch(input: {
   };
 }
 
+export async function updateBranch(
+  branchId: string,
+  input: { name: string; address: string },
+): Promise<BranchRecord> {
+  const ref = firestore().collection("branches").doc(branchId);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) throw notFound("الفرع غير موجود");
+
+  await ref.update({
+    name: input.name,
+    address: input.address,
+    updatedAt: Timestamp.now(),
+  });
+  return getBranch(branchId);
+}
+
+export async function deleteBranch(branchId: string): Promise<void> {
+  const ref = firestore().collection("branches").doc(branchId);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) throw notFound("الفرع غير موجود");
+
+  const [students, expenses] = await Promise.all([
+    firestore().collection("students").where("branchId", "==", branchId).limit(1).get(),
+    firestore().collection("expenses").where("branchId", "==", branchId).limit(1).get(),
+  ]);
+  if (!students.empty || !expenses.empty) {
+    throw badRequest("لا يمكن حذف فرع يحتوي على طلاب أو مصروفات");
+  }
+
+  await ref.delete();
+}
+
 function studentFromDoc(id: string, data: DocumentData): StudentRecord {
   return {
     id,
@@ -185,6 +217,40 @@ export async function listPayments(studentId?: string) {
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+export async function listPaymentsByBranch(branchId?: string) {
+  const query = branchId
+    ? firestore().collection("payments").where("branchId", "==", branchId)
+    : firestore().collection("payments");
+  const snapshot = await query.get();
+  return snapshot.docs
+    .map((doc) => paymentFromDoc(doc.id, doc.data()))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function listPaymentsForStudents(studentIds: Set<string>) {
+  if (studentIds.size === 0) return [];
+
+  const ids = Array.from(studentIds);
+  const chunks: string[][] = [];
+  for (let index = 0; index < ids.length; index += 30) {
+    chunks.push(ids.slice(index, index + 30));
+  }
+
+  const snapshots = await Promise.all(
+    chunks.map((chunk) =>
+      firestore()
+        .collection("payments")
+        .where("studentId", "in", chunk)
+        .get(),
+    ),
+  );
+  return snapshots
+    .flatMap((snapshot) =>
+      snapshot.docs.map((doc) => paymentFromDoc(doc.id, doc.data())),
+    )
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
 export async function createStudentWithPayment(input: {
   name: string;
   phone: string;
@@ -215,6 +281,7 @@ export async function createStudentWithPayment(input: {
     });
     transaction.set(paymentRef, {
       studentId: studentRef.id,
+      branchId: input.branchId,
       amount: input.firstPayment.amount,
       method: input.firstPayment.method,
       receiptFileName: input.firstPayment.receiptFileName ?? null,
@@ -253,16 +320,34 @@ export async function createPayment(input: {
   receiptFileName?: string;
   receiptUrl?: string;
 }): Promise<PaymentRecord> {
-  await getStudent(input.studentId);
-  const ref = firestore().collection("payments").doc();
+  const db = firestore();
+  const studentRef = db.collection("students").doc(input.studentId);
+  const ref = db.collection("payments").doc();
   const createdAt = Timestamp.now();
-  await ref.set({
-    studentId: input.studentId,
-    amount: input.amount,
-    method: input.method,
-    receiptFileName: input.receiptFileName ?? null,
-    receiptUrl: input.receiptUrl ?? null,
-    createdAt,
+  await db.runTransaction(async (transaction) => {
+    const studentSnapshot = await transaction.get(studentRef);
+    if (!studentSnapshot.exists) throw notFound("الطالب غير موجود");
+
+    const paymentsSnapshot = await transaction.get(
+      db.collection("payments").where("studentId", "==", input.studentId),
+    );
+    const paid = paymentsSnapshot.docs.reduce(
+      (sum, payment) => sum + Number(payment.data().amount ?? 0),
+      0,
+    );
+    if (paid + input.amount > input.totalFee) {
+      throw badRequest("لا يمكن أن يتجاوز مجموع الدفعات رسوم الدورة");
+    }
+
+    transaction.set(ref, {
+      studentId: input.studentId,
+      branchId: String(studentSnapshot.data()?.branchId ?? ""),
+      amount: input.amount,
+      method: input.method,
+      receiptFileName: input.receiptFileName ?? null,
+      receiptUrl: input.receiptUrl ?? null,
+      createdAt,
+    });
   });
   return {
     id: ref.id,
@@ -375,9 +460,7 @@ export async function dashboardSummary(branchId?: string) {
     offset: 0,
   });
   const studentIds = new Set(studentsResult.items.map((student) => student.id));
-  const payments = (await listPayments()).filter((payment) =>
-    studentIds.has(payment.studentId),
-  );
+  const payments = await listPaymentsForStudents(studentIds);
   const expenses = await listExpenses(branchId);
 
   return branches.map((branch) => {
