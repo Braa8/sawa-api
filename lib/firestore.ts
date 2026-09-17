@@ -117,15 +117,15 @@ export async function createBranch(input: {
 
 export async function updateBranch(
   branchId: string,
-  input: { name: string; address: string },
+  input: { name?: string; address?: string },
 ): Promise<BranchRecord> {
   const ref = firestore().collection("branches").doc(branchId);
   const snapshot = await ref.get();
   if (!snapshot.exists) throw notFound("الفرع غير موجود");
 
   await ref.update({
-    name: input.name,
-    address: input.address,
+    ...(input.name === undefined ? {} : { name: input.name }),
+    ...(input.address === undefined ? {} : { address: input.address }),
     updatedAt: Timestamp.now(),
   });
   return getBranch(branchId);
