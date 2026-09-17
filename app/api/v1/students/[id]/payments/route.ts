@@ -9,7 +9,6 @@ import {
   createPayment,
   getStudent,
   listPayments,
-  PaymentRecord,
 } from "../../../../../../lib/firestore";
 import { createPaymentSchema, parseBody } from "../../../../../../lib/validation";
 
@@ -47,18 +46,12 @@ export async function POST(request: Request, context: Context) {
     assertBranchAccess(user, student.branchId);
     const input = parseBody(createPaymentSchema, await readJson(request));
     requireShamCashReceipt(input);
-    const paid = (await listPayments(id)).reduce(
-      (sum: number, payment: PaymentRecord) => sum + payment.amount,
-      0,
-    );
-    if (paid + input.amount > student.totalFee) {
-      throw badRequest("لا يمكن أن يتجاوز مجموع الدفعات رسوم الدورة");
-    }
     return json(
       {
         payment: await createPayment({
           studentId: id,
           ...input,
+          totalFee: student.totalFee,
         }),
       },
       201,

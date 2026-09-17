@@ -40,9 +40,9 @@ export const createBranchSchema = z.object({
 });
 
 export const createManagerSchema = z.object({
-  userId: z.string().trim().min(1),
   name: z.string().trim().min(2).max(120),
-  email: z.string().email(),
+  email: z.string().trim().toLowerCase().email(),
+  password: z.string().min(6).max(128),
   branchId: z.string().trim().min(1),
 });
 

@@ -47,6 +47,9 @@ export async function POST(request: Request) {
     assertBranchAccess(user, input.branchId);
     await getBranch(input.branchId);
     requireShamCashReceipt(input.firstPayment);
+    if (input.firstPayment.amount > input.totalFee) {
+      throw badRequest("لا يمكن أن تتجاوز الدفعة الأولى إجمالي رسوم الدورة");
+    }
     const result = await createStudentWithPayment(input);
     return json(result, 201);
   });

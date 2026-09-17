@@ -249,6 +249,7 @@ export async function createPayment(input: {
   studentId: string;
   amount: number;
   method: PaymentMethod;
+  totalFee: number;
   receiptFileName?: string;
   receiptUrl?: string;
 }): Promise<PaymentRecord> {

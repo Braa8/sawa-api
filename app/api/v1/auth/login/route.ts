@@ -90,7 +90,7 @@ export async function POST(request: Request) {
           },
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Login verification error:", error);
 
       return json(

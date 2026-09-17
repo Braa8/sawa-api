@@ -68,9 +68,14 @@ export async function POST(request: Request) {
           },
           400,
         );
-      } catch (error: any) {
+      } catch (error: unknown) {
         // User not found, continue with registration
-        if (error.code !== "auth/user-not-found") {
+        if (
+          typeof error !== "object" ||
+          error === null ||
+          !("code" in error) ||
+          error.code !== "auth/user-not-found"
+        ) {
           throw error;
         }
       }
@@ -112,7 +117,7 @@ export async function POST(request: Request) {
         },
         201,
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Registration error:", error);
       
       // Don't expose sensitive error details to client
