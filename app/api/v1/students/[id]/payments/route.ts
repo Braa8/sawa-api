@@ -19,12 +19,15 @@ function requireShamCashReceipt(input: {
   receiptFileName?: string;
   receiptUrl?: string;
 }) {
-  if (
-    input.method === "sham_cash" &&
-    !input.receiptFileName &&
-    !input.receiptUrl
-  ) {
-    throw badRequest("إيصال PDF إلزامي عند اختيار شام كاش");
+  if (input.method !== "sham_cash") return;
+  
+  // Receipt is now optional for shamCash
+  // Only validate if provided
+  if (input.receiptFileName && !/\.pdf$/i.test(input.receiptFileName)) {
+    throw badRequest("إيصال شام كاش يجب أن يكون بصيغة PDF");
+  }
+  if (input.receiptUrl && !/\.pdf(?:$|\?)/i.test(input.receiptUrl)) {
+    throw badRequest("رابط إيصال شام كاش يجب أن يشير إلى ملف PDF");
   }
 }
 
