@@ -7,8 +7,16 @@ export const paymentMethodSchema = z.enum(["cash", "sham_cash"]);
 export const firstPaymentSchema = z.object({
   amount: z.number().positive(),
   method: paymentMethodSchema,
-  receiptFileName: z.string().min(1).optional(),
-  receiptUrl: z.string().url().optional(),
+
+  receiptFileName: z.preprocess(
+    (value) => (value === null ? undefined : value),
+    z.string().min(1).optional(),
+  ),
+
+  receiptUrl: z.preprocess(
+    (value) => (value === null ? undefined : value),
+    z.string().url().optional(),
+  ),
 });
 
 export const createStudentSchema = z.object({
@@ -23,8 +31,16 @@ export const createStudentSchema = z.object({
 export const createPaymentSchema = z.object({
   amount: z.number().positive(),
   method: paymentMethodSchema,
-  receiptFileName: z.string().min(1).optional(),
-  receiptUrl: z.string().url().optional(),
+
+  receiptFileName: z.preprocess(
+    (value) => (value === null ? undefined : value),
+    z.string().min(1).optional(),
+  ),
+
+  receiptUrl: z.preprocess(
+    (value) => (value === null ? undefined : value),
+    z.string().url().optional(),
+  ),
 });
 
 export const createExpenseSchema = z.object({
@@ -44,7 +60,10 @@ export const updateBranchSchema = z
     name: z.string().trim().min(2).max(120).optional(),
     address: z.string().trim().min(2).max(240).optional(),
   })
-  .refine((value) => value.name !== undefined || value.address !== undefined);
+  .refine(
+    (value) =>
+      value.name !== undefined || value.address !== undefined,
+  );
 
 export const createManagerSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -58,9 +77,14 @@ export function parseBody<T extends z.ZodTypeAny>(
   body: unknown,
 ): z.infer<T> {
   const result = schema.safeParse(body);
+
   if (!result.success) {
-    throw badRequest("البيانات المرسلة غير صحيحة", result.error.flatten());
+    throw badRequest(
+      "البيانات المرسلة غير صحيحة",
+      result.error.flatten(),
+    );
   }
+
   return result.data;
 }
 
@@ -71,9 +95,16 @@ export function parseQueryNumber(
   max: number,
 ) {
   if (!value) return fallback;
+
   const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+
+  if (
+    !Number.isInteger(parsed) ||
+    parsed < min ||
+    parsed > max
+  ) {
     return fallback;
   }
+
   return parsed;
 }
