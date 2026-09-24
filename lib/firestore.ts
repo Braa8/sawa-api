@@ -26,6 +26,11 @@ export type StudentRecord = {
   course: string;
   totalFee: number;
   currency: PaymentCurrency;
+
+  // صور الهوية اختيارية.
+  identityFrontUrl: string | null;
+  identityBackUrl: string | null;
+
   createdAt: string;
 };
 
@@ -194,6 +199,17 @@ function studentFromDoc(id: string, data: DocumentData): StudentRecord {
     // السجلات القديمة التي لا تحتوي على currency تعتبر SYP.
     currency: paymentCurrency(data.currency),
 
+    // صور الهوية اختيارية، والسجلات القديمة لا تحتوي عليها.
+    identityFrontUrl:
+      data.identityFrontUrl
+        ? String(data.identityFrontUrl)
+        : null,
+
+    identityBackUrl:
+      data.identityBackUrl
+        ? String(data.identityBackUrl)
+        : null,
+
     createdAt: isoDate(data.createdAt),
   };
 }
@@ -316,6 +332,10 @@ export async function createStudentWithPayment(input: {
   totalFee: number;
   currency: PaymentCurrency;
 
+  // صور الهوية اختيارية.
+  identityFrontUrl?: string;
+  identityBackUrl?: string;
+
   firstPayment: {
     amount: number;
     currency: PaymentCurrency;
@@ -345,6 +365,11 @@ export async function createStudentWithPayment(input: {
       course: input.course,
       totalFee: input.totalFee,
       currency: input.currency,
+
+      // صور الهوية اختيارية.
+      identityFrontUrl: input.identityFrontUrl ?? null,
+      identityBackUrl: input.identityBackUrl ?? null,
+
       createdAt,
       updatedAt: createdAt,
     });
@@ -370,6 +395,11 @@ export async function createStudentWithPayment(input: {
       course: input.course,
       totalFee: input.totalFee,
       currency: input.currency,
+
+      // إرجاع روابط صور الهوية للتطبيق.
+      identityFrontUrl: input.identityFrontUrl ?? null,
+      identityBackUrl: input.identityBackUrl ?? null,
+
       createdAt: createdAt.toDate().toISOString(),
     } satisfies StudentRecord,
 

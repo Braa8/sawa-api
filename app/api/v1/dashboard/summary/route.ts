@@ -1,7 +1,4 @@
-import {
-  handleRoute,
-  json,
-} from "../../../../../lib/api";
+import { handleRoute, json } from "../../../../../lib/api";
 
 import {
   requireUser,
@@ -14,9 +11,7 @@ import {
 
 export async function GET(request: Request) {
   return handleRoute(async () => {
-    const user = await requireUser(
-      request as never,
-    );
+    const user = await requireUser(request as never);
 
     const url = new URL(request.url);
 
@@ -25,8 +20,7 @@ export async function GET(request: Request) {
       url.searchParams.get("branchId"),
     );
 
-    const branches =
-      await dashboardSummary(branchId);
+    const branches = await dashboardSummary(branchId);
 
     const totals = branches.reduce(
       (result, item) => ({
@@ -34,6 +28,22 @@ export async function GET(request: Request) {
           result.students +
           item.studentsCount,
 
+        // نحافظ على الحقل القديم collected
+        // ليبقى متوافقاً مع الواجهة الحالية،
+        // وهو يمثل الليرة السورية.
+        collected:
+          result.collected +
+          item.collected,
+
+        expenses:
+          result.expenses +
+          item.expenses.SYP,
+
+        net:
+          result.net +
+          item.net.SYP,
+
+        // إجماليات العملتين.
         collectedByCurrency: {
           SYP:
             result.collectedByCurrency.SYP +
@@ -66,6 +76,9 @@ export async function GET(request: Request) {
       }),
       {
         students: 0,
+        collected: 0,
+        expenses: 0,
+        net: 0,
 
         collectedByCurrency: {
           SYP: 0,
