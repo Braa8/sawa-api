@@ -21,37 +21,6 @@ function safeFileName(name: string) {
     .slice(-120);
 }
 
-function getExtension(file: File) {
-  const type = file.type.toLowerCase();
-
-  if (type === "image/jpeg") {
-    return "jpg";
-  }
-
-  if (type === "image/png") {
-    return "png";
-  }
-
-  const originalExtension =
-    file.name
-      .split(".")
-      .pop()
-      ?.toLowerCase();
-
-  if (
-    originalExtension === "jpg" ||
-    originalExtension === "jpeg"
-  ) {
-    return "jpg";
-  }
-
-  if (originalExtension === "png") {
-    return "png";
-  }
-
-  return null;
-}
-
 export async function POST(request: Request) {
   return handleRoute(async () => {
     await requireUser(request as never);
@@ -61,8 +30,7 @@ export async function POST(request: Request) {
         {
           error: {
             code: "STORAGE_NOT_CONFIGURED",
-            message:
-              "تخزين الصور غير مهيأ بعد",
+            message: "تخزين الصور غير مهيأ بعد",
           },
         },
         503,
@@ -95,10 +63,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (
-      file.size >
-      MAX_IDENTITY_IMAGE_BYTES
-    ) {
+    if (file.size > MAX_IDENTITY_IMAGE_BYTES) {
       throw badRequest(
         "حجم صورة الهوية يتجاوز الحد المسموح وهو 5MB",
       );
@@ -110,23 +75,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const extension =
-      getExtension(file);
-
-    if (!extension) {
-      throw badRequest(
-        "امتداد صورة الهوية غير مدعوم",
-      );
-    }
-
     const blob = await put(
       `student-identities/${side}/${crypto.randomUUID()}-${safeFileName(file.name)}`,
       file,
       {
         access: "public",
         addRandomSuffix: false,
-        token:
-          process.env.BLOB_READ_WRITE_TOKEN,
+        token: process.env.BLOB_READ_WRITE_TOKEN,
         contentType: file.type,
       },
     );
@@ -137,8 +92,7 @@ export async function POST(request: Request) {
           side,
           url: blob.url,
           pathname: blob.pathname,
-          contentType:
-            blob.contentType,
+          contentType: blob.contentType,
           size: file.size,
           fileName: file.name,
         },
