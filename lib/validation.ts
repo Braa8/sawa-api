@@ -44,6 +44,16 @@ export const createStudentSchema = z.object({
   currency: paymentCurrencySchema,
 
   firstPayment: firstPaymentSchema,
+
+  identityFrontUrl: z.preprocess(
+    (value) => (value === null ? undefined : value),
+    z.string().url().optional(),
+  ),
+
+  identityBackUrl: z.preprocess(
+    (value) => (value === null ? undefined : value),
+    z.string().url().optional(),
+  ),
 });
 
 export const createPaymentSchema = z.object({
