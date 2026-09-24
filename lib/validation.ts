@@ -131,15 +131,28 @@ export function parseBody<T extends z.ZodTypeAny>(
   const result = schema.safeParse(body);
 
   if (!result.success) {
+    const issues = result.error.issues.map((issue) => ({
+      path: issue.path.join("."),
+      message: issue.message,
+      code: issue.code,
+    }));
+
+    console.error("❌ Validation failed:", issues);
+    console.error(
+      "❌ Received body:",
+      JSON.stringify(body, null, 2),
+    );
+
     throw badRequest(
       "البيانات المرسلة غير صحيحة",
-      result.error.flatten(),
+      {
+        issues,
+      },
     );
   }
 
   return result.data;
 }
-
 export function parseQueryNumber(
   value: string | null,
   fallback: number,
