@@ -4,15 +4,18 @@ import {
   json,
   readJson,
 } from "../../../../../../lib/api";
+
 import {
   assertBranchAccess,
   requireUser,
 } from "../../../../../../lib/auth";
+
 import {
   createPayment,
   getStudent,
   listPayments,
 } from "../../../../../../lib/firestore";
+
 import {
   createPaymentSchema,
   parseBody,
@@ -23,30 +26,40 @@ type Context = {
 };
 
 type PaymentInput = {
+  currency: "SYP" | "USD";
   method: "cash" | "sham_cash";
+  amount: number;
   receiptFileName?: string;
   receiptUrl?: string;
 };
 
-function validatePayment(payment: PaymentInput) {
+function validatePayment(
+  payment: PaymentInput,
+) {
+  // الكاش لا يحتاج إيصالًا.
   if (payment.method === "cash") {
     return;
   }
 
+  // شام كاش: الإيصال اختياري.
+  // إذا أُرسل، يجب أن يكون PDF.
   if (payment.method === "sham_cash") {
-    // إيصال شام كاش اختياري.
     if (
       payment.receiptFileName &&
       !/\.pdf$/i.test(payment.receiptFileName)
     ) {
-      throw badRequest("إيصال شام كاش يجب أن يكون بصيغة PDF");
+      throw badRequest(
+        "إيصال شام كاش يجب أن يكون بصيغة PDF",
+      );
     }
 
     if (
       payment.receiptUrl &&
       !/\.pdf(?:$|\?)/i.test(payment.receiptUrl)
     ) {
-      throw badRequest("رابط إيصال شام كاش يجب أن يشير إلى ملف PDF");
+      throw badRequest(
+        "رابط إيصال شام كاش يجب أن يشير إلى ملف PDF",
+      );
     }
 
     return;
@@ -60,12 +73,18 @@ export async function GET(
   context: Context,
 ) {
   return handleRoute(async () => {
-    const user = await requireUser(request as never);
+    const user = await requireUser(
+      request as never,
+    );
+
     const { id } = await context.params;
 
     const student = await getStudent(id);
 
-    assertBranchAccess(user, student.branchId);
+    assertBranchAccess(
+      user,
+      student.branchId,
+    );
 
     return json({
       items: await listPayments(id),
@@ -78,12 +97,18 @@ export async function POST(
   context: Context,
 ) {
   return handleRoute(async () => {
-    const user = await requireUser(request as never);
+    const user = await requireUser(
+      request as never,
+    );
+
     const { id } = await context.params;
 
     const student = await getStudent(id);
 
-    assertBranchAccess(user, student.branchId);
+    assertBranchAccess(
+      user,
+      student.branchId,
+    );
 
     const input = parseBody(
       createPaymentSchema,
@@ -92,17 +117,34 @@ export async function POST(
 
     validatePayment(input);
 
-    if (input.amount > student.totalFee) {
+    if (
+      input.currency !== student.currency
+    ) {
+      throw badRequest(
+        "عملة الدفعة يجب أن تطابق عملة رسوم الدورة",
+      );
+    }
+
+    if (
+      input.amount > student.totalFee
+    ) {
       throw badRequest(
         "لا يمكن أن تتجاوز الدفعة إجمالي رسوم الدورة",
       );
     }
 
-    const payment = await createPayment({
-      studentId: id,
-      ...input,
-      totalFee: student.totalFee,
-    });
+    const payment =
+      await createPayment({
+        studentId: id,
+        amount: input.amount,
+        currency: input.currency,
+        method: input.method,
+        totalFee: student.totalFee,
+        receiptFileName:
+          input.receiptFileName,
+        receiptUrl:
+          input.receiptUrl,
+      });
 
     return json(
       {

@@ -1,14 +1,22 @@
-import { badRequest, handleRoute, json, readJson } from "../../../../lib/api";
+import {
+  badRequest,
+  handleRoute,
+  json,
+  readJson,
+} from "../../../../lib/api";
+
 import {
   assertBranchAccess,
   requireUser,
   scopedBranchId,
 } from "../../../../lib/auth";
+
 import {
   createStudentWithPayment,
   getBranch,
   listStudents,
 } from "../../../../lib/firestore";
+
 import {
   createStudentSchema,
   parseBody,
@@ -16,13 +24,16 @@ import {
 } from "../../../../lib/validation";
 
 type PaymentInput = {
+  currency: "SYP" | "USD";
   method: "cash" | "sham_cash";
   amount: number;
   receiptFileName?: string;
   receiptUrl?: string;
 };
 
-function validateFirstPayment(payment: PaymentInput) {
+function validateFirstPayment(
+  payment: PaymentInput,
+) {
   // الكاش لا يحتاج إيصالًا.
   if (payment.method === "cash") {
     return;
@@ -35,14 +46,18 @@ function validateFirstPayment(payment: PaymentInput) {
       payment.receiptFileName &&
       !/\.pdf$/i.test(payment.receiptFileName)
     ) {
-      throw badRequest("إيصال شام كاش يجب أن يكون بصيغة PDF");
+      throw badRequest(
+        "إيصال شام كاش يجب أن يكون بصيغة PDF",
+      );
     }
 
     if (
       payment.receiptUrl &&
       !/\.pdf(?:$|\?)/i.test(payment.receiptUrl)
     ) {
-      throw badRequest("رابط إيصال شام كاش يجب أن يشير إلى ملف PDF");
+      throw badRequest(
+        "رابط إيصال شام كاش يجب أن يشير إلى ملف PDF",
+      );
     }
 
     return;
@@ -54,6 +69,7 @@ function validateFirstPayment(payment: PaymentInput) {
 export async function GET(request: Request) {
   return handleRoute(async () => {
     const user = await requireUser(request as never);
+
     const url = new URL(request.url);
 
     const branchId = scopedBranchId(
@@ -63,13 +79,18 @@ export async function GET(request: Request) {
 
     const result = await listStudents({
       branchId,
-      search: url.searchParams.get("search") ?? undefined,
+
+      search:
+        url.searchParams.get("search") ??
+        undefined,
+
       limit: parseQueryNumber(
         url.searchParams.get("limit"),
         25,
         1,
         100,
       ),
+
       offset: parseQueryNumber(
         url.searchParams.get("offset"),
         0,
@@ -91,19 +112,37 @@ export async function POST(request: Request) {
       await readJson(request),
     );
 
-    assertBranchAccess(user, input.branchId);
+    assertBranchAccess(
+      user,
+      input.branchId,
+    );
 
     await getBranch(input.branchId);
 
-    validateFirstPayment(input.firstPayment);
+    validateFirstPayment(
+      input.firstPayment,
+    );
 
-    if (input.firstPayment.amount > input.totalFee) {
+    if (
+      input.firstPayment.currency !==
+      input.currency
+    ) {
+      throw badRequest(
+        "عملة الدفعة يجب أن تطابق عملة رسوم الدورة",
+      );
+    }
+
+    if (
+      input.firstPayment.amount >
+      input.totalFee
+    ) {
       throw badRequest(
         "لا يمكن أن تتجاوز الدفعة الأولى إجمالي رسوم الدورة",
       );
     }
 
-    const result = await createStudentWithPayment(input);
+    const result =
+      await createStudentWithPayment(input);
 
     return json(result, 201);
   });

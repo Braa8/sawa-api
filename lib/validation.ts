@@ -2,10 +2,21 @@ import { z } from "zod";
 
 import { badRequest } from "./api";
 
-export const paymentMethodSchema = z.enum(["cash", "sham_cash"]);
+export const paymentMethodSchema = z.enum([
+  "cash",
+  "sham_cash",
+]);
+
+export const paymentCurrencySchema = z.enum([
+  "SYP",
+  "USD",
+]);
 
 export const firstPaymentSchema = z.object({
   amount: z.number().positive(),
+
+  currency: paymentCurrencySchema,
+
   method: paymentMethodSchema,
 
   receiptFileName: z.preprocess(
@@ -21,15 +32,25 @@ export const firstPaymentSchema = z.object({
 
 export const createStudentSchema = z.object({
   name: z.string().trim().min(2).max(120),
+
   phone: z.string().trim().min(5).max(30),
+
   branchId: z.string().trim().min(1),
+
   course: z.string().trim().min(1).max(120),
+
   totalFee: z.number().positive(),
+
+  currency: paymentCurrencySchema,
+
   firstPayment: firstPaymentSchema,
 });
 
 export const createPaymentSchema = z.object({
   amount: z.number().positive(),
+
+  currency: paymentCurrencySchema,
+
   method: paymentMethodSchema,
 
   receiptFileName: z.preprocess(
@@ -45,30 +66,51 @@ export const createPaymentSchema = z.object({
 
 export const createExpenseSchema = z.object({
   branchId: z.string().trim().min(1),
+
   title: z.string().trim().min(2).max(160),
+
   amount: z.number().positive(),
+
+  currency: paymentCurrencySchema,
+
   date: z.string().datetime().optional(),
 });
 
 export const createBranchSchema = z.object({
   name: z.string().trim().min(2).max(120),
+
   address: z.string().trim().min(2).max(240),
 });
 
 export const updateBranchSchema = z
   .object({
-    name: z.string().trim().min(2).max(120).optional(),
-    address: z.string().trim().min(2).max(240).optional(),
+    name: z
+      .string()
+      .trim()
+      .min(2)
+      .max(120)
+      .optional(),
+
+    address: z
+      .string()
+      .trim()
+      .min(2)
+      .max(240)
+      .optional(),
   })
   .refine(
     (value) =>
-      value.name !== undefined || value.address !== undefined,
+      value.name !== undefined ||
+      value.address !== undefined,
   );
 
 export const createManagerSchema = z.object({
   name: z.string().trim().min(2).max(120),
+
   email: z.string().trim().toLowerCase().email(),
+
   password: z.string().min(6).max(128),
+
   branchId: z.string().trim().min(1),
 });
 
